@@ -1,0 +1,63 @@
+#! /usr/bin/env ruby
+
+require 'newrelic_plugin'
+require 'beaneater'
+
+module BeanstalkdPlugin
+  class Agent < NewRelic::Plugin::Agent::Base
+    agent_guid 'io.joos.newrelic.plugin.beanstalkd'
+    agent_version '0.0.1'
+    agent_config_options :name, :host, :port
+
+    def initialize context, options = {}
+      options[:name] ||= 'Beanstalkd'
+      options[:host] ||= 'localhost'
+      options[:port] ||= 11300
+      super
+    end
+
+    agent_human_labels('Beanstalkd') do
+      "#{@name} (#{@host}:#{@port})"
+    end
+
+    def poll_cycle
+      beanstalk = Beaneater::Pool.new(["#{@host}:#{@port}"])
+
+      tube_names = beanstalkd.tubes.all
+
+      tube_names.each do |tube_name|
+        report_tube beanstalkd.tubes["#{tube_name}"]
+      end
+    end
+
+    def report_tube(tube)
+      report_tube_metrics "Tubes/#{tube['name']}", tube.stats
+    end
+
+    def report_tube_metrics(metric, stats)
+      metric_name = "#{@name}/#{metric}"
+
+      report_metric metric_name, 'UrgentJobs', tube_stats['current-jobs-urgent']
+      report_metric metric_name, 'IdleJobs', tube_stats['current-jobs-ready']
+      report_metric metric_name, 'RunningJobs', tube_stats['current-jobs-reserved']
+      report_metric metric_name, 'DelayedJobs', tube_stats['current-jobs-delayed']
+      report_metric metric_name, 'BuriedJobs', tube_stats['current-jobs-buried']
+      report_metric metric_name, 'TotalJobs', tube_stats['total-jobs']
+      report_metric metric_name, 'BusyWorkers', tube_stats['current-using']
+      report_metric metric_name, 'WaitingWorkers', tube_stats['current-waiting']
+      report_metric metric_name, 'TotalWorkers', tube_stats['current-watching']
+      report_metric metric_name, '%BusyWorkers', tube_stats['current-watching'] > 0 ? (tube_stats['current-jobs-reserved'] / tube_stats['current-watching']) * 100 : 0
+      report_metric metric_name, 'WaitingJobsPerWorker', (tube_stats['current-jobs-ready'] / tube_stats['current-watching']) if tube_stats['current-watching'] > 0
+    end
+  end
+
+  #
+  # Register this agent with the component.
+  #
+  NewRelic::Plugin::Setup.install_agent :beanstalkd, self
+
+  #
+  # Launch the agent; this never returns.
+  #
+  NewRelic::Plugin::Run.setup_and_run
+end
