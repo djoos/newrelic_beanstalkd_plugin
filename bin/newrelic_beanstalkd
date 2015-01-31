@@ -13,6 +13,7 @@ module BeanstalkdPlugin
       options[:name] ||= 'Beanstalkd'
       options[:host] ||= 'localhost'
       options[:port] ||= 11300
+
       super
     end
 
@@ -21,43 +22,68 @@ module BeanstalkdPlugin
     end
 
     def poll_cycle
-      beanstalk = Beaneater::Pool.new(["#{@host}:#{@port}"])
+      beanstalkd = Beaneater::Pool.new(["#{@host}:#{@port}"])
 
-      tube_names = beanstalkd.tubes.all
+      tubes = beanstalkd.tubes.all
 
-      tube_names.each do |tube_name|
-        report_tube beanstalkd.tubes["#{tube_name}"]
+      tubes.each do |tube|
+        report_tube tube.stats
       end
+
+      report_server beanstalkd.stats
+
+      beanstalkd.close
     end
 
-    def report_tube(tube)
-      report_tube_metrics "Tubes/#{tube['name']}", tube.stats
+    def report_tube(stats)
+      report_tube_metrics "Tubes/#{stats['name']}", stats
+    end
+
+    def report_server(stats)
+      report_server_metrics "Server/#{stats['name']}", stats
     end
 
     def report_tube_metrics(metric, stats)
-      metric_name = "#{@name}/#{metric}"
+      metric_name = "Beanstalkd/#{metric}"
 
-      report_metric metric_name, 'UrgentJobs', tube_stats['current-jobs-urgent']
-      report_metric metric_name, 'IdleJobs', tube_stats['current-jobs-ready']
-      report_metric metric_name, 'RunningJobs', tube_stats['current-jobs-reserved']
-      report_metric metric_name, 'DelayedJobs', tube_stats['current-jobs-delayed']
-      report_metric metric_name, 'BuriedJobs', tube_stats['current-jobs-buried']
-      report_metric metric_name, 'TotalJobs', tube_stats['total-jobs']
-      report_metric metric_name, 'BusyWorkers', tube_stats['current-using']
-      report_metric metric_name, 'WaitingWorkers', tube_stats['current-waiting']
-      report_metric metric_name, 'TotalWorkers', tube_stats['current-watching']
-      report_metric metric_name, '%BusyWorkers', tube_stats['current-watching'] > 0 ? (tube_stats['current-jobs-reserved'] / tube_stats['current-watching']) * 100 : 0
-      report_metric metric_name, 'WaitingJobsPerWorker', (tube_stats['current-jobs-ready'] / tube_stats['current-watching']) if tube_stats['current-watching'] > 0
+      report_metric metric_name, 'UrgentJobs', stats[:current_jobs_urgent]
+      report_metric metric_name, 'IdleJobs', stats[:current_jobs_ready]
+      report_metric metric_name, 'RunningJobs', stats[:current_jobs_reserved]
+      report_metric metric_name, 'DelayedJobs', stats[:current_jobs_delayed]
+      report_metric metric_name, 'BuriedJobs', stats[:current_jobs_buried]
+      report_metric metric_name, 'TotalJobs', stats[:total_jobs]
+      report_metric metric_name, 'BusyWorkers', stats[:current_using]
+      report_metric metric_name, 'WaitingWorkers', stats[:current_waiting]
+      report_metric metric_name, 'TotalWorkers', stats[:current_watching]
+      report_metric metric_name, 'PercentBusyWorkers', stats[:current_watching] > 0 ? (stats[:current_jobs_reserved] / stats[:current_watching]) * 100 : 0
+      report_metric metric_name, 'IdleJobsPerWorker', (stats[:current_jobs_ready] / stats[:current_watching]) if stats[:current_watching] > 0
+    end
+
+    def report_server_metrics(metric, stats)
+      metric_name = "Beanstalkd/#{metric}"
+
+      report_metric metric_name, 'UrgentJobs', stats[:current_jobs_urgent]
+      report_metric metric_name, 'IdleJobs', stats[:current_jobs_ready]
+      report_metric metric_name, 'RunningJobs', stats[:current_jobs_reserved]
+      report_metric metric_name, 'DelayedJobs', stats[:current_jobs_delayed]
+      report_metric metric_name, 'BuriedJobs', stats[:current_jobs_buried]
+      report_metric metric_name, 'TotalJobs', stats[:total_jobs]
+      report_metric metric_name, 'Tubes', stats[:current_tubes]
+      report_metric metric_name, 'CurrentConnections', stats[:current_connections]
+      report_metric metric_name, 'CurrentProducers', stats[:current_producers]
+      report_metric metric_name, 'CurrentWorkers', stats[:current_workers]
+      report_metric metric_name, 'WaitingWorkers', stats[:current_waiting]
+      report_metric metric_name, 'Uptime', stats[:uptime]
     end
   end
 
   #
-  # Register this agent with the component.
+  # Register the agent with the component
   #
   NewRelic::Plugin::Setup.install_agent :beanstalkd, self
 
   #
-  # Launch the agent; this never returns.
+  # Launch the agent
   #
   NewRelic::Plugin::Run.setup_and_run
 end
