@@ -47,6 +47,9 @@ module BeanstalkdPlugin
     def report_tube_metrics(metric, stats)
       metric_name = "Beanstalkd/#{metric}"
 
+      percent_busy = stats[:current_watching] > 0 ? (stats[:current_jobs_reserved] / stats[:current_watching]) * 100 : 0
+      percent_idle = stats[:current_watching] > 0 ? (stats[:current_jobs_ready] / stats[:current_watching]) * 100 : 0
+
       report_metric metric_name, 'UrgentJobs', stats[:current_jobs_urgent]
       report_metric metric_name, 'IdleJobs', stats[:current_jobs_ready]
       report_metric metric_name, 'RunningJobs', stats[:current_jobs_reserved]
@@ -56,12 +59,17 @@ module BeanstalkdPlugin
       report_metric metric_name, 'BusyWorkers', stats[:current_using]
       report_metric metric_name, 'WaitingWorkers', stats[:current_waiting]
       report_metric metric_name, 'TotalWorkers', stats[:current_watching]
-      report_metric metric_name, 'PercentBusyWorkers', stats[:current_watching] > 0 ? (stats[:current_jobs_reserved] / stats[:current_watching]) * 100 : 0
       report_metric metric_name, 'IdleJobsPerWorker', (stats[:current_jobs_ready] / stats[:current_watching]) if stats[:current_watching] > 0
+      report_metric metric_name, 'PercentBusyWorkers', percent_busy
+      report_metric metric_name, 'PercentIdleWorkers', percent_idle
+      report_metric metric_name, 'WaitTime', percent_idle > 0 ? percent_busy / percent_idle : 0
     end
 
     def report_server_metrics(metric, stats)
       metric_name = "Beanstalkd/#{metric}"
+
+      percent_busy = stats[:current_workers] > 0 ? (stats[:current_jobs_reserved] / stats[:current_workers]) * 100 : 0
+      percent_idle = stats[:current_workers] > 0 ? (stats[:current_jobs_ready] / stats[:current_workers]) * 100 : 0
 
       report_metric metric_name, 'UrgentJobs', stats[:current_jobs_urgent]
       report_metric metric_name, 'IdleJobs', stats[:current_jobs_ready]
@@ -75,6 +83,9 @@ module BeanstalkdPlugin
       report_metric metric_name, 'CurrentWorkers', stats[:current_workers]
       report_metric metric_name, 'WaitingWorkers', stats[:current_waiting]
       report_metric metric_name, 'Uptime', stats[:uptime]
+      report_metric metric_name, 'PercentBusyWorkers', percent_busy
+      report_metric metric_name, 'PercentIdleWorkers', percent_idle
+      report_metric metric_name, 'WaitTime', percent_idle > 0 ? percent_busy / percent_idle : 0
     end
   end
 
