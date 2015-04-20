@@ -47,7 +47,7 @@ module BeanstalkdPlugin
     def report_tube_metrics(metric, stats)
       metric_name = "Beanstalkd/#{metric}"
 
-      percent_busy = stats[:current_watching] > 0 ? (stats[:current_using] / stats[:current_watching]) * 100 : 0
+      percent_busy = stats[:current_watching] > 0 ? (stats[:current_jobs_reserved] / stats[:current_watching]) * 100 : 0
       percent_idle = 100 - percent_busy
 
       report_metric metric_name, 'UrgentJobs', stats[:current_jobs_urgent]
@@ -68,8 +68,8 @@ module BeanstalkdPlugin
     def report_server_metrics(metric, stats)
       metric_name = "Beanstalkd/#{metric}"
 
-      percent_idle = stats[:current_workers] > 0 ? (stats[:current_waiting] / stats[:current_workers]) * 100 : 0
-      percent_busy = 100 - percent_idle
+      percent_busy = stats[:current_workers] > 0 ? (stats[:current_jobs_reserved] / stats[:current_workers]) * 100 : 0
+      percent_idle = 100 - percent_busy
 
       report_metric metric_name, 'UrgentJobs', stats[:current_jobs_urgent]
       report_metric metric_name, 'IdleJobs', stats[:current_jobs_ready]
