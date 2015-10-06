@@ -1,4 +1,4 @@
 source 'https://rubygems.org'
 
 gem 'newrelic_plugin'
-gem 'beaneater'
+gem 'beaneater', '< 1.0'
